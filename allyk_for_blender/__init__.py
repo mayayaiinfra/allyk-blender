@@ -13,7 +13,7 @@ import bpy
 from bpy.props import BoolProperty, StringProperty
 from bpy_extras.io_utils import ImportHelper
 
-from . import api, keystore, runner
+from . import api, errorlog, keystore, runner
 
 
 class ALLYK_Preferences(bpy.types.AddonPreferences):
@@ -127,6 +127,7 @@ _CLASSES = (ALLYK_Preferences, ALLYK_OT_pair, ALLYK_OT_unpair, ALLYK_OT_send_sna
 
 
 def register():
+    errorlog.prepare()
     for cls in _CLASSES:
         bpy.utils.register_class(cls)
     if keystore.load_state().get("linked"):

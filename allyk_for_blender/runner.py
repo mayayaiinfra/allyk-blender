@@ -21,7 +21,7 @@ from pathlib import Path
 
 import bpy
 
-from . import api, commands, keystore, snapshot
+from . import api, commands, errorlog, keystore, snapshot
 
 CLIENT_VERSION = "0.1.0"
 CLAIM_INTERVAL = 5.0
@@ -51,9 +51,13 @@ def _applied_path() -> Path:
 
 
 def _applied() -> dict:
+    path = _applied_path()
+    if not path.exists():
+        return {}
     try:
-        return json.loads(_applied_path().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        errorlog.record("store.applied", error, "unreadable")
         return {}
 
 
@@ -75,7 +79,11 @@ def _worker():
         try:
             _main.put((job, payload, job_call(job, payload), None))
         except api.ApiError as error:
+            errorlog.record(f"api.{job}", error, error.code)
             _main.put((job, payload, None, error))
+        except Exception as error:  # Never let one bad call stop the network thread.
+            errorlog.record(f"worker.{job}", error, "unexpected")
+            _main.put((job, payload, None, api.ApiError(0, "unavailable")))
 
 
 def job_call(job, payload):
@@ -201,11 +209,13 @@ def _apply_run(run):
                       "new_revision": snapshot.scene_revision(),
                       "outputs": [_fingerprint(item) for item in outputs]}
         except commands.Refused as refusal:
+            errorlog.record("command.apply", refusal, refusal.reason)
             result = {"protocol_version": commands.PROTOCOL, "command_id": command_id, "status": "refused",
                       "reason": refusal.reason, "new_revision": snapshot.scene_revision()}
             if refusal.message:
                 result["message"] = refusal.message
-        except Exception:  # Blender raised: report a failure, never the exception text (it may hold paths).
+        except Exception as error:  # Blender raised: report a failure, never the exception text (it may hold paths).
+            errorlog.record("command.apply", error, "application_error")
             result = {"protocol_version": commands.PROTOCOL, "command_id": command_id, "status": "failed",
                       "reason": "application_error", "new_revision": snapshot.scene_revision()}
         _remember(run_id, command_id, result)
@@ -227,6 +237,15 @@ def _fingerprint(item):
 
 def tick():
     """Runs on Blender's main thread every second while the add-on is enabled."""
+    try:
+        _tick()
+    except Exception as error:  # A raising timer is removed by Blender; log it and keep the loop alive.
+        errorlog.record("timer.tick", error, "unexpected")
+        state.update(busy=False, message="ALLYK for Blender hit an error; it will try again.")
+    return 1.0
+
+
+def _tick():
     while not _main.empty():
         _handle(*_main.get_nowait())
     now = time.monotonic()
@@ -239,4 +258,3 @@ def tick():
     if state["connected"] and device.get("linked") and not state["busy"] and now - state["last_claim"] >= CLAIM_INTERVAL:
         state.update(last_claim=now, busy=True)
         _jobs.put(("claim", {"key": device["key"]}))
-    return 1.0

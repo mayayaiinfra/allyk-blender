@@ -16,6 +16,8 @@ from pathlib import Path
 
 import bpy
 
+from . import errorlog
+
 _FOLDER = "allyk_for_blender"
 
 
@@ -30,15 +32,18 @@ def _write_private(path: Path, data: dict) -> None:
     tmp.write_text(json.dumps(data), encoding="utf-8")
     try:
         os.chmod(tmp, 0o600)
-    except OSError:
-        pass
+    except OSError as error:
+        errorlog.record("store.permissions", error, "chmod_failed")
     os.replace(tmp, path)
 
 
 def _read(path: Path) -> dict:
+    if not path.exists():
+        return {}
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError) as error:
+        errorlog.record("store.read", error, "unreadable")
         return {}
 
 
@@ -58,10 +63,7 @@ def save_state(state: dict) -> None:
 
 def forget() -> None:
     for name in ("device.json",):
-        try:
-            (_folder() / name).unlink()
-        except FileNotFoundError:
-            pass
+        (_folder() / name).unlink(missing_ok=True)
 
 
 def load_assets() -> dict:

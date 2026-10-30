@@ -60,6 +60,22 @@ run without a pause is decided by the access mode you choose in ALLYK; any
 approval happens in ALLYK, never in Blender. If the scene changed since ALLYK
 planned a run, the add-on refuses it and changes nothing.
 
+A command ALLYK sends again (for example after a lost connection) is applied
+only once: the add-on keeps each applied command's result and sends that result
+again instead of repeating the change.
+
+## Local files
+
+All in Blender's user config folder, under `allyk_for_blender`:
+
+- `device.json`: this device's own ALLYK key (removed when you unpair).
+- `applied.json`: the results of commands already applied, until ALLYK has
+  accepted them.
+- `errors.jsonl`: a local error log, one line per failure with the UTC time,
+  where it happened, the error type and a short code. Never keys, codes, text,
+  file or scene paths. It is rotated at 256 KB (one older file,
+  `errors.1.jsonl`, is kept) and is never sent anywhere.
+
 ## Licence
 
 ALLYK for Blender is free software, licensed under the GNU General Public
