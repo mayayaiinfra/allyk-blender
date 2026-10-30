@@ -18,11 +18,11 @@ Requires Blender 4.2 or later (tested with Blender 5.2 LTS).
    `blender --command extension build --source-dir allyk_for_blender`
 2. In Blender: Edit > Preferences > Get Extensions > Install from Disk, and
    choose the zip.
+3. In the add-on's preferences, choose an output folder for renders and
+   exports.
 
 ALLYK's Design Bridge is in owner-only testing, so pairing works only for
 accounts ALLYK has enabled.
-3. In the add-on's preferences, choose an output folder for renders and
-   exports.
 
 ## Pair with ALLYK
 
