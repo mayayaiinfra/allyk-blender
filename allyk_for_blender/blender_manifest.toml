@@ -1,0 +1,19 @@
+schema_version = "1.0.0"
+
+id = "allyk_for_blender"
+version = "0.1.0"
+name = "ALLYK for Blender"
+tagline = "Run ALLYK's typed design commands in your own Blender"
+maintainer = "MAYAYAI"
+type = "add-on"
+website = "https://github.com/mayayaiinfra/allyk-blender"
+tags = ["Pipeline", "Scene", "Import-Export"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 MAYAYAI"]
+
+[permissions]
+network = "Exchange scene summaries and commands with allyk.app"
+files = "Import files you choose; write renders to your folder"
