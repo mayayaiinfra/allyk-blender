@@ -185,13 +185,15 @@ def _apply_run(run):
     run_id = run["run_id"]
     done = _applied().get(run_id, {})
     results = []
-    for index, command in enumerate(sorted(run["commands"], key=lambda item: item["sequence"])):
+    for command in sorted(run["commands"], key=lambda item: item["sequence"]):
         command_id = command["command_id"]
         if command_id in done:
             results.append((command_id, done[command_id]))
             continue
         try:
-            if index == 0 and not done and command.get("planned_revision") != snapshot.scene_revision():
+            # Only the run's first command is checked against the planned revision: later
+            # commands (for example after an approval pause) follow this run's own changes.
+            if command.get("sequence") == 0 and command.get("planned_revision") != snapshot.scene_revision():
                 raise commands.Refused("stale_revision", "The scene changed since ALLYK planned this run.")
             name, params = commands.validate(command)
             outputs = commands.apply(name, params, keystore.load_assets(), prefs.output_folder, run_id)
