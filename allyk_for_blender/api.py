@@ -12,6 +12,8 @@ import ssl
 import urllib.error
 import urllib.request
 
+from . import errorlog
+
 DEFAULT_BASE_URL = "https://allyk.app/api/native/design"
 TIMEOUT_SECONDS = 20
 
@@ -46,7 +48,8 @@ def call(base_url: str, method: str, path: str, body: dict | None = None, key: s
     except urllib.error.HTTPError as error:
         try:
             payload = json.loads(error.read().decode("utf-8") or "{}")
-        except ValueError:
+        except ValueError as parse_error:
+            errorlog.record("api.response", parse_error, "error_body_unreadable")
             payload = {}
         raise ApiError(error.code, str(payload.get("error") or "unavailable"), payload) from None
     except (urllib.error.URLError, TimeoutError, OSError):
