@@ -34,7 +34,7 @@ def call(base_url: str, method: str, path: str, body: dict | None = None, key: s
     url = base_url.rstrip("/") + path
     if not (url.startswith("https://") or url.startswith("http://localhost") or url.startswith("http://127.0.0.1")):
         raise ApiError(0, "insecure_url")
-    headers = {"accept": "application/json", "x-allyk-client-version": "allyk-for-blender/0.1.0"}
+    headers = {"accept": "application/json", "x-allyk-client-version": "allyk-for-blender/0.1.1"}
     data = None
     if body is not None:
         data = json.dumps(body, separators=(",", ":")).encode("utf-8")

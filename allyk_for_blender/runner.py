@@ -23,11 +23,14 @@ import bpy
 
 from . import api, commands, errorlog, keystore, snapshot
 
-CLIENT_VERSION = "0.1.0"
+CLIENT_VERSION = "0.1.1"
 CLAIM_INTERVAL = 5.0
+# Pairing polls wait the server's interval plus this margin after the last reply
+# (DESIGN_PUBLIC_API.md section 3.2), so network delay never makes a poll early.
+POLL_MARGIN = 1.0
 
 state = {"status": "not_paired", "message": "", "user_code": "", "verification_uri": "", "connected": False,
-         "busy": False, "last_claim": 0.0, "poll_interval": 5.0, "last_poll": 0.0}
+         "busy": False, "last_claim": 0.0, "poll_interval": 5.0, "last_poll": 0.0, "polling": False}
 _jobs: "queue.Queue[tuple]" = queue.Queue()
 _main: "queue.Queue[tuple]" = queue.Queue()
 
@@ -79,7 +82,9 @@ def _worker():
         try:
             _main.put((job, payload, job_call(job, payload), None))
         except api.ApiError as error:
-            errorlog.record(f"api.{job}", error, error.code)
+            if not (job == "poll" and error.code == "slow_down"):
+                # slow_down while pairing is expected backoff, not a failure (DI-10).
+                errorlog.record(f"api.{job}", error, error.code)
             _main.put((job, payload, None, error))
         except Exception as error:  # Never let one bad call stop the network thread.
             errorlog.record(f"worker.{job}", error, "unexpected")
@@ -138,6 +143,9 @@ def send_snapshot(character_object=None):
 # ---- main-thread timer ------------------------------------------------------
 
 def _handle(job, payload, result, error):
+    if job == "poll":
+        # The next poll is timed from this reply, not from when the request was queued.
+        state.update(polling=False, last_poll=time.monotonic())
     if error is not None:
         if error.status == 401:
             keystore.forget()
@@ -160,6 +168,8 @@ def _handle(job, payload, result, error):
                      message="Type this code at the address below, signed in to ALLYK.")
     elif job == "poll":
         status = result.get("status")
+        if result.get("interval"):
+            state["poll_interval"] = float(result["interval"])
         if status == "linked":
             device = keystore.load_state()
             device["linked"] = True
@@ -250,8 +260,9 @@ def _tick():
         _handle(*_main.get_nowait())
     now = time.monotonic()
     device = keystore.load_state()
-    if state["status"] == "waiting_for_user" and device.get("pairing_id") and now - state["last_poll"] >= state["poll_interval"]:
-        state["last_poll"] = now
+    if (state["status"] == "waiting_for_user" and device.get("pairing_id") and not state["polling"]
+            and now - state["last_poll"] >= state["poll_interval"] + POLL_MARGIN):
+        state["polling"] = True
         _jobs.put(("poll", {"pairing_id": device["pairing_id"], "key_hash": device["key_hash"]}))
     if device.get("linked") and state["status"] != "paired":
         state["status"] = "paired"

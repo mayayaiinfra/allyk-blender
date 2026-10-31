@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "allyk_for_blender"
-version = "0.1.0"
+version = "0.1.1"
 name = "ALLYK for Blender"
 tagline = "Run ALLYK's typed design commands in your own Blender"
 maintainer = "MAYAYAI"
