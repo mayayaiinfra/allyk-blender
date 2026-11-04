@@ -23,7 +23,7 @@ import bpy
 
 from . import api, commands, errorlog, keystore, snapshot
 
-CLIENT_VERSION = "0.1.1"
+CLIENT_VERSION = "0.1.2"
 CLAIM_INTERVAL = 5.0
 # Pairing polls wait the server's interval plus this margin after the last reply
 # (DESIGN_PUBLIC_API.md section 3.2), so network delay never makes a poll early.

@@ -81,9 +81,10 @@ def _resolution(value):
 
 # name: (required, optional, field checks)
 _SPEC = {
-    "scene.import_asset": ({"path_token", "format"}, set(), {
+    "scene.import_asset": ({"path_token", "format"}, {"object_ref"}, {
         "path_token": _token,
-        "format": lambda v: _enum(v, {"glb", "gltf"})}),
+        "format": lambda v: _enum(v, {"glb", "gltf"}),
+        "object_ref": _ref}),
     "scene.set_transform": ({"object_ref"}, {"location", "rotation_deg", "scale"}, {
         "object_ref": _ref, "location": lambda v: _vec(v, 3, -100000, 100000),
         "rotation_deg": lambda v: _vec(v, 3, -360, 360), "scale": lambda v: _vec(v, 3, 0.0001, 10000)}),
@@ -156,6 +157,21 @@ def _named(ref, kind):
     return obj
 
 
+def _name_import_root(added, root_name, scene):
+    """Give what one import added a single name (section 6): one top-level object is renamed;
+    several are parented, keeping their world placement, to a new empty with that name."""
+    tops = [obj for obj in added if obj.parent not in added]
+    if len(tops) == 1:
+        tops[0].name = root_name
+        return
+    root = bpy.data.objects.new(root_name, None)
+    scene.collection.objects.link(root)
+    for obj in tops:
+        placement = obj.matrix_world.copy()
+        obj.parent = root
+        obj.matrix_world = placement
+
+
 def _output_path(folder: str, name: str) -> str:
     if not folder or not os.path.isdir(folder):
         raise Refused("application_error", "Choose an output folder in ALLYK for Blender's preferences.")
@@ -188,7 +204,13 @@ def apply(name: str, params: dict, assets: dict, output_folder: str, run_id: str
         asset = assets.get(params["path_token"])
         if not asset or not os.path.isfile(asset["path"]):
             raise Refused("unknown_path_token")
+        root_name = params.get("object_ref")
+        if root_name is not None and bpy.data.objects.get(root_name) is not None:
+            raise Refused("application_error", "Another object already has that name.")
+        before = set(bpy.data.objects)
         bpy.ops.import_scene.gltf(filepath=asset["path"])
+        if root_name is not None:
+            _name_import_root([obj for obj in bpy.data.objects if obj not in before], root_name, scene)
     elif name == "scene.set_transform":
         obj = _object(params["object_ref"])
         if "location" in params:
